@@ -75,6 +75,7 @@ export class ServicioService {
         payload,
         {
           headers: {
+            Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
             'X-Signature': signature,
             'Content-Type': 'application/json',
           },

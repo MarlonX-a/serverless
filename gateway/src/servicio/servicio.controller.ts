@@ -28,8 +28,9 @@ export class ServicioGatewayController {
   // 🔥 CONSULTA DISTRIBUIDA (nivel avanzado)
   @Get(':id/comentarios')
   async servicioConComentarios(@Param('id') id: number) {
-    const servicio = await this.servicio.obtener(id).toPromise();
-    const comentarios = await this.comentario.listarPorServicio(id).toPromise();
+    const servicio = await this.servicio.obtener(id);
+    const comentarios = await this.comentario.listarPorServicio(id);
+
 
     return {
       servicio,
