@@ -1,0 +1,96 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: postgres-2
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_INITDB_ARGS: -c client_encoding=UTF8
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/01-init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+
+  servicio-ms:
+    build: ./servicio-ms
+    container_name: servicio-ms-2
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+    environment:
+      - PORT=3001
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - DB_NAME=servicio_db
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672
+      - RABBITMQ_QUEUE_SERVICIO=servicio_queue
+      - WEBHOOK_SECRET=super_secreto_123
+      - WEBHOOK_URL=https://faauqpjwnjcsgohxskqi.supabase.co/functions/v1/webhook-event-logger
+    ports:
+      - "3001:3001"
+
+  comentario-ms:
+    build: ./comentario-ms
+    container_name: comentario-ms-2
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+    environment:
+      - PORT=3002
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - DB_NAME=comentario_db
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672
+      - RABBITMQ_QUEUE_COMENTARIO=comentario_queue
+      - RABBITMQ_QUEUE_SERVICIO=servicio_queue
+      - WEBHOOK_SECRET=super_secreto_123
+      - WEBHOOK_URL=https://faauqpjwnjcsgohxskqi.supabase.co/functions/v1/webhook-event-logger
+    ports:
+      - "3002:3002"
+
+  gateway:
+    build: ./gateway
+    container_name: gateway-2
+    depends_on:
+      comentario-ms:
+        condition: service_started
+      servicio-ms:
+        condition: service_started
+      rabbitmq:
+        condition: service_started
+    environment:
+      - PORT=3000
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672
+      - RABBITMQ_QUEUE_COMENTARIO=comentario_queue
+      - RABBITMQ_QUEUE_SERVICIO=servicio_queue
+    ports:
+      - "3000:3000"
+
+volumes:
+  postgres_data:
